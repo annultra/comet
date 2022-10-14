@@ -8,7 +8,7 @@ interface IWstETH {
     function tokensPerStEth() external view returns (uint256);
 }
 
-contract WSTETHPriceFeed is AggregatorV3Interface {
+contract WstETHPriceFeed is AggregatorV3Interface {
     /** Custom errors **/
     error InvalidInt256();
     error NotImplemented();
@@ -23,10 +23,15 @@ contract WSTETHPriceFeed is AggregatorV3Interface {
     uint public constant override version = 1;
 
     /// @notice
-    address public stETHtoUSDPriceFeed = 0xCfE54B5cD566aB89272946F602D76Ea879CAb4a8;
+    address public immutable stETHtoUSDPriceFeed;
 
     /// @notice
-    address public wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    address public immutable wstETH;
+
+    constructor(address stETHtoUSDPriceFeed_, address wstETH_) {
+        stETHtoUSDPriceFeed = stETHtoUSDPriceFeed_;
+        wstETH = wstETH_;
+    }
 
     /**
      * @notice

@@ -1,52 +1,49 @@
 import hre, { ethers } from 'hardhat';
-import { expect } from './helpers';
+import { exp, expect } from './helpers';
 import { HttpNetworkConfig } from 'hardhat/types/config';
 import {
-  WSTETHPriceFeed,
-  WSTETHPriceFeed__factory
+  SimplePriceFeed__factory,
+  SimpleWstETH__factory,
+  WstETHPriceFeed__factory
 } from '../build/types';
 
-export async function forkMainnet() {
-  const mainnetConfig = hre.config.networks.mainnet as HttpNetworkConfig;
-  await ethers.provider.send(
-    'hardhat_reset',
-    [
-      {
-        forking: {
-          jsonRpcUrl: mainnetConfig.url,
-        },
-      },
-    ],
+export async function makeWstETH({ stEthPrice, tokensPerStEth }) {
+  const SimplePriceFeedFactory = (await ethers.getContractFactory('SimplePriceFeed')) as SimplePriceFeed__factory;
+  const stETHpriceFeed = await SimplePriceFeedFactory.deploy(stEthPrice, 8);
+
+  const SimpleWstETHFactory = (await ethers.getContractFactory('SimpleWstETH')) as SimpleWstETH__factory;
+  const simpleWstETH = await SimpleWstETHFactory.deploy(tokensPerStEth);
+
+  const wstETHPriceFeedFactory = (await ethers.getContractFactory('WstETHPriceFeed')) as WstETHPriceFeed__factory;
+  const wstETHPriceFeed = await wstETHPriceFeedFactory.deploy(
+    stETHpriceFeed.address,
+    simpleWstETH.address
   );
-}
-
-export async function resetHardhatNetwork() {
-  // reset to blank hardhat network
-  await ethers.provider.send('hardhat_reset', []);
-}
-
-
-export async function makeWstETH() {
-  const wstETHPriceFeedFactory = (await ethers.getContractFactory('WSTETHPriceFeed')) as WSTETHPriceFeed__factory;
-  const wstETHPriceFeed = await wstETHPriceFeedFactory.deploy();
   await wstETHPriceFeed.deployed();
 
   return {
+    simpleWstETH,
+    stETHpriceFeed,
     wstETHPriceFeed
   };
 }
 
+const testCases = [
+  {
+    stEthPrice: 128874639019,
+    tokensPerStEth: exp(9, 18),
+    result: 0
+  }
+];
+
 describe.only('wstETH price feed', function () {
-  before(forkMainnet);
-  after(resetHardhatNetwork);
+  for (const { stEthPrice, tokensPerStEth, result } of testCases) {
+    it(`stEthPrice ${stEthPrice} tokensPerStEth ${tokensPerStEth} -> ${result}`, async () => {
+      const { wstETHPriceFeed } = await makeWstETH({ stEthPrice, tokensPerStEth });
+      const latestRoundData = await wstETHPriceFeed.latestRoundData();
+      const price = latestRoundData.answer.toBigInt();
 
-  it('tests something', async () => {
-    const { wstETHPriceFeed } = await makeWstETH();
-    const latestRoundData = await wstETHPriceFeed.latestRoundData();
-
-    console.log(latestRoundData.answer.toBigInt());
-
-    expect(true).to.be.true;
-  });
-
+      expect(price).to.eq(result);
+    });
+  }
 });
